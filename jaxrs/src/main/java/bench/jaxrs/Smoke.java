@@ -61,7 +61,7 @@ public class Smoke {
             pool.shutdown();
             pool.awaitTermination(1, TimeUnit.MINUTES);
             long intercepted = TimedInterceptor.CALLS.sum();
-            long wanted = 4L * (1 + (long) threads * calls);
+            long wanted = 4L * (1 + 3 + (long) threads * calls); // first call, 3 sequential shop calls, concurrent part
             if (intercepted != wanted) {
                 throw new AssertionError("Timed interceptor ran " + intercepted + " times, expected " + wanted);
             }
