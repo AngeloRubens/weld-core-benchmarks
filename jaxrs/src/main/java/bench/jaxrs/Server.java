@@ -1,6 +1,7 @@
 package bench.jaxrs;
 
 import org.jboss.resteasy.cdi.CdiInjectorFactory;
+import org.jboss.resteasy.cdi.ResteasyCdiExtension;
 import org.jboss.resteasy.core.ResteasyDeploymentImpl;
 import org.jboss.resteasy.core.SynchronousDispatcher;
 import org.jboss.resteasy.mock.MockHttpRequest;
@@ -20,6 +21,7 @@ public class Server implements AutoCloseable {
         // no classpath scanning: the Jandex that comes with RESTEasy clashes with the one Weld SE needs
         container = new Weld().disableDiscovery()
                 .beanClasses(OrderResource.class, OrderService.class, RequestInfo.class, AuditTrail.class)
+                .addExtension(new ResteasyCdiExtension())
                 .initialize();
         deployment = new ResteasyDeploymentImpl();
         deployment.setInjectorFactoryClass(CdiInjectorFactory.class.getName());
