@@ -2,7 +2,8 @@ name: Weld benchmark (patched Weld vs release)
 
 on:
   push:
-    branches: [ ci/bench ]
+    # ci/bench: everything; ci/probe: build and behaviour probe only
+    branches: [ ci/bench, ci/probe ]
   workflow_dispatch:
     inputs:
       jmh:
@@ -92,7 +93,7 @@ jobs:
             done
           } >> "$GITHUB_STEP_SUMMARY"
       - name: JMH, rounds interleaved across variants
-        if: ${{ inputs.jmh != false }}
+        if: ${{ inputs.jmh != false && github.ref != 'refs/heads/ci/probe' }}
         run: |
           labels=$(echo "$VARIANTS" | cut -d'|' -f1 | tr '\n' ' ')
           for round in $(seq 1 $ROUNDS); do
@@ -104,7 +105,7 @@ jobs:
             done
           done
       - name: Summary
-        if: ${{ always() && inputs.jmh != false }}
+        if: ${{ always() && inputs.jmh != false && github.ref != 'refs/heads/ci/probe' }}
         run: |
           labels=$(echo "$VARIANTS" | cut -d'|' -f1 | tr '\n' ' ')
           { echo "## JMH ($(nproc) cores, $ROUNDS rounds, $JMH_OPTS), ratio to the first column"; python3 scripts/summary.py results "$labels"; } | tee -a "$GITHUB_STEP_SUMMARY" > results/REPORT.md
