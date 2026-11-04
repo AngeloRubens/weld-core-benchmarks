@@ -78,18 +78,26 @@ jobs:
           base=
           while IFS='|' read -r label rest; do
             [ -z "$label" ] && continue
-            java -cp "probe-out:jars/$label.jar" SelfInvocationProbe > "results/probe/$label.txt" 2> "results/probe/$label.err" || { echo "probe failed for $label"; cat "results/probe/$label.err"; exit 1; }
-            [ "$(wc -l < "results/probe/$label.txt")" -ge 30 ] || { echo "probe printed too few scenarios for $label"; exit 1; }
+            # three fresh JVMs per variant (identity hash codes normalised) to tell nondeterminism from real differences
+            for run in 1 2 3; do
+              java -cp "probe-out:jars/$label.jar" SelfInvocationProbe 2> "results/probe/$label.err" | sed -E 's/@[0-9a-f]{5,8}/@HASH/g' > "results/probe/$label.run$run.txt" \
+                || { echo "probe failed for $label"; cat "results/probe/$label.err"; exit 1; }
+              [ "$(wc -l < "results/probe/$label.run$run.txt")" -ge 30 ] || { echo "probe printed too few scenarios for $label"; exit 1; }
+            done
+            diff -u "results/probe/$label.run1.txt" "results/probe/$label.run2.txt" > "results/probe/selfdiff-$label-1v2.txt" || echo "$label: NONDETERMINISTIC between run 1 and 2"
+            diff -u "results/probe/$label.run1.txt" "results/probe/$label.run3.txt" > "results/probe/selfdiff-$label-1v3.txt" || echo "$label: NONDETERMINISTIC between run 1 and 3"
             [ -z "$base" ] && base=$label
             if [ "$label" != "$base" ]; then
-              diff -u "results/probe/$base.txt" "results/probe/$label.txt" > "results/probe/diff-$base-vs-$label.txt" && echo "$label: identical to $base" || echo "$label: DIFFERS from $base"
+              for run in 1 2 3; do
+                diff -u "results/probe/$base.run$run.txt" "results/probe/$label.run$run.txt" > "results/probe/diff-$base-vs-$label.run$run.txt" && echo "$label run$run: identical to $base" || echo "$label run$run: DIFFERS from $base"
+              done
             fi
           done <<< "$VARIANTS"
           {
-            echo "## Behaviour probe ($(wc -l < results/probe/$(echo "$VARIANTS" | head -1 | cut -d'|' -f1).txt) scenarios)"
-            for f in results/probe/diff-*.txt; do
-              echo; echo "### $(basename "$f" .txt)"; echo '```diff'; cat "$f"; echo '```'
-              [ -s "$f" ] || echo "(no differences)"
+            echo "## Behaviour probe"
+            for f in results/probe/selfdiff-*.txt results/probe/diff-*.txt; do
+              echo; echo "### $(basename "$f" .txt)"
+              if [ -s "$f" ]; then echo '```diff'; cat "$f"; echo '```'; else echo "(no differences)"; fi
             done
           } >> "$GITHUB_STEP_SUMMARY"
       - name: JMH, rounds interleaved across variants
