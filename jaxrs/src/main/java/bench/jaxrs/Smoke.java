@@ -21,6 +21,10 @@ public class Smoke {
             if (r.getStatus() != 200 || !Server.expected(42, "alice").equals(r.getContentAsString())) {
                 throw new AssertionError("unexpected response " + r.getStatus() + " " + r.getContentAsString());
             }
+            r = server.get("/shop/42", "alice");
+            if (r.getStatus() != 200 || !Server.expectedShop(42, "alice").equals(r.getContentAsString())) {
+                throw new AssertionError("unexpected shop response " + r.getStatus() + " " + r.getContentAsString());
+            }
             int threads = 8;
             int calls = 20000;
             ExecutorService pool = Executors.newFixedThreadPool(threads);
@@ -34,6 +38,10 @@ public class Smoke {
                         if (resp.getStatus() != 200 || !Server.expected(i, user).equals(resp.getContentAsString())) {
                             bad++;
                         }
+                        resp = server.get("/shop/" + i, user);
+                        if (resp.getStatus() != 200 || !Server.expectedShop(i, user).equals(resp.getContentAsString())) {
+                            bad++;
+                        }
                     }
                     return bad;
                 }));
@@ -44,7 +52,13 @@ public class Smoke {
             }
             pool.shutdown();
             pool.awaitTermination(1, TimeUnit.MINUTES);
-            System.out.println("smoke: " + (threads * calls) + " concurrent requests, " + bad + " wrong responses");
+            long intercepted = TimedInterceptor.CALLS.sum();
+            long wanted = 4L * (1 + (long) threads * calls);
+            if (intercepted != wanted) {
+                throw new AssertionError("Timed interceptor ran " + intercepted + " times, expected " + wanted);
+            }
+            System.out.println("smoke: timed interceptor ran " + intercepted + " times, as expected");
+            System.out.println("smoke: " + (threads * calls * 2) + " concurrent requests, " + bad + " wrong responses");
             if (bad != 0) {
                 throw new AssertionError(bad + " wrong responses");
             }
