@@ -4,6 +4,11 @@ on:
   push:
     branches: [ ci/bench ]
   workflow_dispatch:
+    inputs:
+      jmh:
+        description: 'Run the JMH benchmarks (false = build and behaviour probe only)'
+        type: boolean
+        default: true
 
 jobs:
   bench:
@@ -72,7 +77,8 @@ jobs:
           base=
           while IFS='|' read -r label rest; do
             [ -z "$label" ] && continue
-            java -cp "probe-out:jars/$label.jar" SelfInvocationProbe > "results/probe/$label.txt" 2> "results/probe/$label.err" || echo "probe failed for $label"
+            java -cp "probe-out:jars/$label.jar" SelfInvocationProbe > "results/probe/$label.txt" 2> "results/probe/$label.err" || { echo "probe failed for $label"; cat "results/probe/$label.err"; exit 1; }
+            [ "$(wc -l < "results/probe/$label.txt")" -ge 30 ] || { echo "probe printed too few scenarios for $label"; exit 1; }
             [ -z "$base" ] && base=$label
             if [ "$label" != "$base" ]; then
               diff -u "results/probe/$base.txt" "results/probe/$label.txt" > "results/probe/diff-$base-vs-$label.txt" && echo "$label: identical to $base" || echo "$label: DIFFERS from $base"
@@ -86,6 +92,7 @@ jobs:
             done
           } >> "$GITHUB_STEP_SUMMARY"
       - name: JMH, rounds interleaved across variants
+        if: ${{ inputs.jmh != false }}
         run: |
           labels=$(echo "$VARIANTS" | cut -d'|' -f1 | tr '\n' ' ')
           for round in $(seq 1 $ROUNDS); do
@@ -97,7 +104,7 @@ jobs:
             done
           done
       - name: Summary
-        if: always()
+        if: ${{ always() && inputs.jmh != false }}
         run: |
           labels=$(echo "$VARIANTS" | cut -d'|' -f1 | tr '\n' ' ')
           { echo "## JMH ($(nproc) cores, $ROUNDS rounds, $JMH_OPTS), ratio to the first column"; python3 scripts/summary.py results "$labels"; } | tee -a "$GITHUB_STEP_SUMMARY" > results/REPORT.md
