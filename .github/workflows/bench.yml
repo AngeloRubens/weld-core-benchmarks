@@ -23,20 +23,20 @@ jobs:
             # <label>|release|<version>   or   <label>|git|<repo>|<commit>; the first one is the baseline
             variants: |
               weld-7.0.0|release|7.0.0.Final
+              main-base|git|https://github.com/AngeloRubens/core|12251dc67f721b063f2bedf5299322aac5292298
               pr3545|git|https://github.com/AngeloRubens/core|38f94f38cb2ea46c46913696148fc9b2fe28016c
-              pr3545-reqcache|git|https://github.com/AngeloRubens/core|d1fa54e24f26936e56e24c47c4da572a749435bd
           - line: weld6
             variants: |
               weld-6.0.4|release|6.0.4.Final
+              branch-base|git|https://github.com/AngeloRubens/core|851330ce3c897ad6fb5c711f9b551ac20b39f5e3
               pr3546|git|https://github.com/AngeloRubens/core|9d8a605943c44a44ca2ef2654f67909f3e0102ad
-              pr3546-reqcache|git|https://github.com/AngeloRubens/core|6825d96a92c5f795cc83c044bc17d02b029d0d4f
     env:
       VARIANTS: ${{ matrix.variants }}
       # the benchmarks of the Weld benchmark suite that touch proxies, interceptors and decorators
       BENCH: '.*(InterceptorBenchmark|NotInterceptedMethodBenchmark|DecoratorBenchmark|ApplicationScopedBenchmark|DependentBenchmark|ComplexBenchmark|BaselineBenchmark)\.run'
       # the ones that matter most for the single-thread view
       BENCH_1T: '.*(InterceptorBenchmark|NotInterceptedMethodBenchmark|DecoratorBenchmark|ApplicationScopedBenchmark)\.run'
-      JMH_OPTS: '-f 2 -wi 3 -w 3s -i 5 -r 3s'
+      JMH_OPTS: '-f 5 -wi 3 -w 3s -i 5 -r 3s'
       ROUNDS: '2'
     steps:
       - uses: actions/checkout@v4
