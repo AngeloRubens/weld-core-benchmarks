@@ -1,0 +1,87 @@
+name: Weld request scope benchmark (PR vs PR + request cache)
+
+on:
+  push:
+    branches: [ ci/reqscope ]
+  workflow_dispatch:
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - line: weld7
+            # <label>|release|<version>   or   <label>|git|<repo>|<commit>; the first one is the baseline
+            variants: |
+              main-base|git|https://github.com/AngeloRubens/core|12251dc67f721b063f2bedf5299322aac5292298
+              pr3545|git|https://github.com/AngeloRubens/core|38f94f38cb2ea46c46913696148fc9b2fe28016c
+              pr3545-reqcache|git|https://github.com/AngeloRubens/core|d1fa54e24f26936e56e24c47c4da572a749435bd
+          - line: weld6
+            variants: |
+              branch-base|git|https://github.com/AngeloRubens/core|851330ce3c897ad6fb5c711f9b551ac20b39f5e3
+              pr3546|git|https://github.com/AngeloRubens/core|9d8a605943c44a44ca2ef2654f67909f3e0102ad
+              pr3546-reqcache|git|https://github.com/AngeloRubens/core|6825d96a92c5f795cc83c044bc17d02b029d0d4f
+    env:
+      VARIANTS: ${{ matrix.variants }}
+      # the benchmarks of the Weld benchmark suite that touch the request scope (plus ApplicationScoped as a control)
+      BENCH: '.*(RequestScopedClientProxyBenchmark|ComplexBenchmark|SimpleRequestScopedObserverBenchmark|EventMetadataRequestScopedObserverBenchmark|ApplicationScopedBenchmark)\.run'
+      # the same ones with one thread
+      BENCH_1T: '.*(RequestScopedClientProxyBenchmark|ComplexBenchmark|SimpleRequestScopedObserverBenchmark|EventMetadataRequestScopedObserverBenchmark|ApplicationScopedBenchmark)\.run'
+      JMH_OPTS: '-f 5 -wi 3 -w 3s -i 5 -r 3s'
+      ROUNDS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Environment
+        run: |
+          java -version; mvn -v; nproc; lscpu | grep 'Model name'
+      - name: Build one benchmark jar per variant
+        run: |
+          mkdir -p jars results
+          while IFS='|' read -r label kind a b; do
+            [ -z "$label" ] && continue
+            if [ "$kind" = release ]; then
+              version=$a
+            else
+              src=$RUNNER_TEMP/src-$label
+              rm -rf "$src"; git init -q "$src"
+              git -C "$src" remote add origin "$a"
+              git -C "$src" fetch -q --depth 1 origin "$b"
+              git -C "$src" checkout -q --detach FETCH_HEAD
+              git -C "$src" log -1 --format="== $label: %H %s"
+              (cd "$src" && mvn -B -ntp -q install -DskipTests -Dno-format -pl environments/se/build -am)
+              version=$(cd "$src" && mvn -B -ntp -q help:evaluate -Dexpression=project.version -DforceStdout)
+            fi
+            echo "== $label uses weld $version"
+            mvn -B -ntp -q clean package -DskipTests -Dversion.weld="$version"
+            cp target/weld-core-benchmarks.jar "jars/$label.jar"
+          done <<< "$VARIANTS"
+          ls -l jars
+      - name: JMH, rounds interleaved across variants
+        run: |
+          labels=$(echo "$VARIANTS" | cut -d'|' -f1 | tr '\n' ' ')
+          for round in $(seq 1 $ROUNDS); do
+            for label in $labels; do
+              echo "== round $round: $label (all threads)"
+              java -jar "jars/$label.jar" "$BENCH" $JMH_OPTS -rf json -rff "results/$label.allthreads.round$round.json"
+              echo "== round $round: $label (1 thread)"
+              java -jar "jars/$label.jar" "$BENCH_1T" $JMH_OPTS -t 1 -rf json -rff "results/$label.1thread.round$round.json"
+            done
+          done
+      - name: Summary
+        if: always()
+        run: |
+          labels=$(echo "$VARIANTS" | cut -d'|' -f1 | tr '\n' ' ')
+          { echo "## JMH ($(nproc) cores, $ROUNDS rounds, $JMH_OPTS), ratio to the first column"; python3 scripts/summary.py results "$labels"; } | tee -a "$GITHUB_STEP_SUMMARY" > results/REPORT.md
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-${{ matrix.line }}
+          path: results/
