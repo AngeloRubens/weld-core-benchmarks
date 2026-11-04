@@ -1,0 +1,24 @@
+name: Diag per-request state on OpenWebBeans
+
+on:
+  push:
+    branches: [ ci/diag-owb ]
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Diag on OWB and on Weld 7.0.0
+        run: |
+          (cd jaxrs && mvn -B -ntp -q clean package -Dowb=true -Dowb.version=4.1.1)
+          cp jaxrs/target/jaxrs.jar owb.jar
+          (cd jaxrs && mvn -B -ntp -q clean package -Dweld.version=7.0.0.Final)
+          cp jaxrs/target/jaxrs.jar weld.jar
+          for j in owb weld; do echo "=== $j"; java -cp $j.jar bench.jaxrs.Diag 2>&1 | grep -E "=>|Exception" ; done
