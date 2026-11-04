@@ -72,6 +72,12 @@
   </profiles>
 
   <dependencies>
+    <!-- RESTEasy 6.2 pulls in an older jboss-logging than Weld 7.0.0.Final needs (NoSuchMethodError in getMessageLogger) -->
+    <dependency>
+      <groupId>org.jboss.logging</groupId>
+      <artifactId>jboss-logging</artifactId>
+      <version>3.6.1.Final</version>
+    </dependency>
     <dependency>
       <groupId>org.jboss.resteasy</groupId>
       <artifactId>resteasy-core</artifactId>
