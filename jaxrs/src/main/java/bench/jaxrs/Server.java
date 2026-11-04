@@ -7,21 +7,21 @@ import org.jboss.resteasy.core.SynchronousDispatcher;
 import org.jboss.resteasy.mock.MockHttpRequest;
 import org.jboss.resteasy.mock.MockHttpResponse;
 import org.jboss.resteasy.spi.ResteasyDeployment;
-import org.jboss.weld.environment.se.Weld;
-import org.jboss.weld.environment.se.WeldContainer;
+import jakarta.enterprise.inject.se.SeContainer;
+import jakarta.enterprise.inject.se.SeContainerInitializer;
 
-/** Weld SE + RESTEasy, dispatching requests in-process (no sockets). */
+/** CDI SE (Weld or OpenWebBeans, through the standard SeContainerInitializer) + RESTEasy, dispatching requests in-process. */
 public class Server implements AutoCloseable {
 
-    private final WeldContainer container;
+    private final SeContainer container;
     private final ResteasyDeployment deployment;
     private final SynchronousDispatcher dispatcher;
 
     public Server() {
         // no classpath scanning: the Jandex that comes with RESTEasy clashes with the one Weld SE needs
-        container = new Weld().disableDiscovery()
-                .beanClasses(OrderResource.class, OrderService.class, RequestInfo.class, AuditTrail.class)
-                .addExtension(new ResteasyCdiExtension())
+        container = SeContainerInitializer.newInstance().disableDiscovery()
+                .addBeanClasses(OrderResource.class, OrderService.class, RequestInfo.class, AuditTrail.class)
+                .addExtensions(new ResteasyCdiExtension())
                 .initialize();
         deployment = new ResteasyDeploymentImpl();
         deployment.setInjectorFactoryClass(CdiInjectorFactory.class.getName());
@@ -44,6 +44,6 @@ public class Server implements AutoCloseable {
     @Override
     public void close() {
         deployment.stop();
-        container.shutdown();
+        container.close();
     }
 }

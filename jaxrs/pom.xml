@@ -13,14 +13,65 @@
     <weld.version>7.0.0.Final</weld.version>
     <resteasy.version>6.2.11.Final</resteasy.version>
     <jmh.version>1.37</jmh.version>
+    <owb.version>4.1.1</owb.version>
   </properties>
 
+  <profiles>
+    <!-- default: Weld; -Dowb=true selects Apache OpenWebBeans -->
+    <profile>
+      <id>weld</id>
+      <activation>
+        <property><name>!owb</name></property>
+      </activation>
+      <dependencies>
+        <dependency>
+          <groupId>org.jboss.weld.se</groupId>
+          <artifactId>weld-se-shaded</artifactId>
+          <version>${weld.version}</version>
+        </dependency>
+      </dependencies>
+    </profile>
+    <profile>
+      <id>owb</id>
+      <activation>
+        <property><name>owb</name></property>
+      </activation>
+      <dependencies>
+        <dependency>
+          <groupId>jakarta.enterprise</groupId>
+          <artifactId>jakarta.enterprise.cdi-api</artifactId>
+          <version>4.1.0</version>
+        </dependency>
+        <dependency>
+          <groupId>jakarta.inject</groupId>
+          <artifactId>jakarta.inject-api</artifactId>
+          <version>2.0.1</version>
+        </dependency>
+        <dependency>
+          <groupId>jakarta.interceptor</groupId>
+          <artifactId>jakarta.interceptor-api</artifactId>
+          <version>2.2.0</version>
+        </dependency>
+        <dependency>
+          <groupId>jakarta.annotation</groupId>
+          <artifactId>jakarta.annotation-api</artifactId>
+          <version>3.0.0</version>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.openwebbeans</groupId>
+          <artifactId>openwebbeans-impl</artifactId>
+          <version>${owb.version}</version>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.openwebbeans</groupId>
+          <artifactId>openwebbeans-se</artifactId>
+          <version>${owb.version}</version>
+        </dependency>
+      </dependencies>
+    </profile>
+  </profiles>
+
   <dependencies>
-    <dependency>
-      <groupId>org.jboss.weld.se</groupId>
-      <artifactId>weld-se-shaded</artifactId>
-      <version>${weld.version}</version>
-    </dependency>
     <dependency>
       <groupId>org.jboss.resteasy</groupId>
       <artifactId>resteasy-core</artifactId>
