@@ -17,7 +17,10 @@ public class Server implements AutoCloseable {
     private final SynchronousDispatcher dispatcher;
 
     public Server() {
-        container = new Weld().initialize();
+        // no classpath scanning: the Jandex that comes with RESTEasy clashes with the one Weld SE needs
+        container = new Weld().disableDiscovery()
+                .beanClasses(OrderResource.class, OrderService.class, RequestInfo.class, AuditTrail.class)
+                .initialize();
         deployment = new ResteasyDeploymentImpl();
         deployment.setInjectorFactoryClass(CdiInjectorFactory.class.getName());
         deployment.getActualResourceClasses().add(OrderResource.class);
