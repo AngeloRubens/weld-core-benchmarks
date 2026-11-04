@@ -180,6 +180,7 @@ public class SelfInvocationProbe {
     public static class Counter implements Bean {
         final AtomicInteger calls = new AtomicInteger();
         @Trace public int hit() { return calls.incrementAndGet(); }
+        public int total() { return calls.get(); }
     }
 
     static void run(String name, Supplier<Object> body) {
@@ -267,7 +268,7 @@ public class SelfInvocationProbe {
             for (Future<Integer> f : fs) total += f.get();
             ex.shutdown();
             ex.awaitTermination(1, TimeUnit.MINUTES);
-            System.out.println("concurrent ok=" + total + " hits=" + counter.calls.get());
+            System.out.println("concurrent ok=" + total + " hits=" + counter.total());
         }
     }
 }
