@@ -25,6 +25,14 @@ public class Smoke {
             if (r.getStatus() != 200 || !Server.expectedShop(42, "alice").equals(r.getContentAsString())) {
                 throw new AssertionError("unexpected shop response " + r.getStatus() + " " + r.getContentAsString());
             }
+            // per-request state must not leak between sequential calls on one thread (it did on OpenWebBeans, see Server)
+            for (int i = 0; i < 3; i++) {
+                String o = server.get("/orders/42", "alice").getContentAsString();
+                String sh = server.get("/shop/42", "alice").getContentAsString();
+                if (!Server.expected(42, "alice").equals(o) || !Server.expectedShop(42, "alice").equals(sh)) {
+                    throw new AssertionError("per-request state leaked between sequential calls: " + o + " / " + sh);
+                }
+            }
             int threads = 8;
             int calls = 20000;
             ExecutorService pool = Executors.newFixedThreadPool(threads);

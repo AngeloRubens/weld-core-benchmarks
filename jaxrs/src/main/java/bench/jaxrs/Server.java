@@ -19,12 +19,33 @@ public class Server implements AutoCloseable {
 
     public Server() {
         // no classpath scanning: the Jandex that comes with RESTEasy clashes with the one Weld SE needs
-        container = SeContainerInitializer.newInstance().disableDiscovery()
-                .addBeanClasses(OrderResource.class, OrderService.class, RequestInfo.class, AuditTrail.class,
-                        ShopResource.class, ShopFacade.class, PricingService.class, InventoryService.class,
-                        CustomerService.class, TimedInterceptor.class, LoggedInterceptor.class, TxInterceptor.class)
-                .addExtensions(new ResteasyCdiExtension())
-                .initialize();
+        // OpenWebBeans SE leaves a request context active on the thread that boots the container, and @ActivateRequestContext
+        // then reuses it for every later call on that thread. Boot on a throwaway thread so every request gets a fresh context.
+        SeContainer[] booted = new SeContainer[1];
+        Throwable[] failure = new Throwable[1];
+        Thread boot = new Thread(() -> {
+            try {
+                // no classpath scanning: the Jandex that comes with RESTEasy clashes with the one Weld SE needs
+                booted[0] = SeContainerInitializer.newInstance().disableDiscovery()
+                        .addBeanClasses(OrderResource.class, OrderService.class, RequestInfo.class, AuditTrail.class,
+                                ShopResource.class, ShopFacade.class, PricingService.class, InventoryService.class,
+                                CustomerService.class, TimedInterceptor.class, LoggedInterceptor.class, TxInterceptor.class)
+                        .addExtensions(new ResteasyCdiExtension())
+                        .initialize();
+            } catch (Throwable t) {
+                failure[0] = t;
+            }
+        }, "cdi-boot");
+        boot.start();
+        try {
+            boot.join();
+        } catch (InterruptedException e) {
+            throw new IllegalStateException(e);
+        }
+        if (failure[0] != null) {
+            throw new IllegalStateException("container failed to start", failure[0]);
+        }
+        container = booted[0];
         deployment = new ResteasyDeploymentImpl();
         deployment.setInjectorFactoryClass(CdiInjectorFactory.class.getName());
         deployment.getActualResourceClasses().add(OrderResource.class);
