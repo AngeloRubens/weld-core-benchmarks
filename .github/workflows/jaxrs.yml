@@ -52,8 +52,9 @@ jobs:
             (cd jaxrs && mvn -B -ntp -q clean package -Dweld.version="$version")
             cp jaxrs/target/jaxrs.jar "jars/$label.jar"
             echo "== smoke $label"
-            java -cp "jars/$label.jar" bench.jaxrs.Smoke 2>&1 | tail -5 | tee "results/smoke-$label.txt"
-            grep -q " 0 wrong responses" "results/smoke-$label.txt" || { echo "smoke failed for $label"; exit 1; }
+            java -cp "jars/$label.jar" bench.jaxrs.Smoke > "results/smoke-$label.txt" 2>&1 || true
+            tail -3 "results/smoke-$label.txt"
+            grep -q " 0 wrong responses" "results/smoke-$label.txt" || { echo "smoke failed for $label"; head -60 "results/smoke-$label.txt"; exit 1; }
           done <<< "$VARIANTS"
       - name: JMH, rounds interleaved across variants
         run: |
