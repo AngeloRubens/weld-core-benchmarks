@@ -197,9 +197,8 @@ public class SelfInvocationProbe {
     public static void main(String[] args) throws Exception {
         try (WeldContainer c = new Weld().disableDiscovery()
                 .beanClasses(DepBean.class, ClassLevel.class, AppBean.class, ReqBean.class, Ping.class, Pong.class,
-                        DepGreeter.class, Counter.class, GreeterDecorator.class)
-                .interceptors(TraceInterceptor.class, Trace2Interceptor.class, TwiceInterceptor.class)
-                .decorators(GreeterDecorator.class)
+                        DepGreeter.class, Counter.class, GreeterDecorator.class,
+                        TraceInterceptor.class, Trace2Interceptor.class, TwiceInterceptor.class)
                 .initialize()) {
             DepBean d = c.select(DepBean.class).get();
             run("dep.a", () -> d.a(1));
