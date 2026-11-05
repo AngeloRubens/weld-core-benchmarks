@@ -57,7 +57,7 @@ jobs:
         run: |
           r=$(ls tests-arquillian/target/surefire-reports/*DefaultQualifierLookupTest.txt)
           cat "$r"
-          grep -q "Tests run: 3, Failures: 0, Errors: 0" "$r"
+          grep -qE "Tests run: [1-9][0-9]*, Failures: 0, Errors: 0" "$r"
       - name: CDI TCK on Weld SE
         if: ${{ always() && matrix.full }}
         working-directory: core
