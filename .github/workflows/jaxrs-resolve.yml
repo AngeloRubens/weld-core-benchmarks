@@ -13,7 +13,7 @@ jobs:
       # <label>|<kind>|...   owb: version   release: Weld version   git: repo + commit
       VARIANTS: |
         pr3545-reqcache|git|https://github.com/AngeloRubens/core|d1fa54e24f26936e56e24c47c4da572a749435bd
-        resolve-default|git|https://github.com/AngeloRubens/core|204ff4b33d702401a1fc579c045651641c39a27a
+        resolve-default|git|https://github.com/AngeloRubens/core|ee5bb405a97c82cc366cbc581a521eb23ee6b42e
       JMH_OPTS: '-f 5 -wi 3 -w 3s -i 5 -r 3s'
       ROUNDS: '2'
     steps:
