@@ -1,4 +1,4 @@
-name: JAX-RS: cheaper getBeans(Class) experiment
+name: JAX-RS cheaper getBeans(Class) experiment
 
 on:
   push:
