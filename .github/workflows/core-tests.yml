@@ -16,11 +16,11 @@ jobs:
         include:
           # the change with its test: everything must pass
           - label: resolve-default
-            commit: 3b8995cb3
+            commit: 6d213c612
             full: true
           # the same without clearing the new cache: the new test must fail
           - label: resolve-default-without-clear
-            commit: 26e3caee
+            commit: e9f344717
             full: false
     steps:
       - uses: actions/checkout@v4
@@ -46,11 +46,18 @@ jobs:
           mvn -B -ntp verify -Dno-format -pl tests-arquillian -Dtest=DefaultQualifierLookupTest -Dsurefire.failIfNoSpecifiedTests=false -DfailIfNoTests=false | tee ../new-test.log || true
           tail -40 ../new-test.log
           grep -E "Tests run:.*DefaultQualifierLookupTest|Tests run:.*Fail" ../new-test.log | head
-          if grep -q "lookupDuringBootDoesNotHideBeanAddedLater" ../new-test.log && grep -q "FAIL\|Failures: [1-9]" ../new-test.log; then echo "the new test fails as intended"; else echo "the new test did NOT fail"; exit 1; fi
+          if grep -qE "Tests run: [1-9][0-9]*, Failures: [1-9]" ../new-test.log && grep -q "lookupDuringBootDoesNotHideBeanAddedLater" ../new-test.log; then echo "the new test fails as intended"; else echo "the new test did NOT fail (or did not run)"; exit 1; fi
       - name: All tests (same command as the Weld CI)
         if: ${{ matrix.full }}
         working-directory: core
         run: mvn -B -ntp clean verify -Dno-format -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false 2>&1 | tee ../all-tests.log
+      - name: The new test ran in the full build and passed
+        if: ${{ always() && matrix.full }}
+        working-directory: core
+        run: |
+          r=$(ls tests-arquillian/target/surefire-reports/*DefaultQualifierLookupTest.txt)
+          cat "$r"
+          grep -q "Tests run: 3, Failures: 0, Errors: 0" "$r"
       - name: CDI TCK on Weld SE
         if: ${{ always() && matrix.full }}
         working-directory: core
