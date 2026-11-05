@@ -16,11 +16,11 @@ jobs:
         include:
           # the change with its test: everything must pass
           - label: resolve-default
-            commit: 6d213c612
+            commit: ee5bb405a
             full: true
           # the same without clearing the new cache: the new test must fail
           - label: resolve-default-without-clear
-            commit: e9f344717
+            commit: e92c92ab6
             full: false
     steps:
       - uses: actions/checkout@v4
