@@ -1,8 +1,8 @@
-name: JAX-RS service layer with interceptors
+name: JAX-RS: cheaper getBeans(Class) experiment
 
 on:
   push:
-    branches: [ ci/jaxrs-shop ]
+    branches: [ ci/jaxrs-resolve ]
   workflow_dispatch:
 
 jobs:
@@ -12,10 +12,8 @@ jobs:
     env:
       # <label>|<kind>|...   owb: version   release: Weld version   git: repo + commit
       VARIANTS: |
-        main-base|git|https://github.com/AngeloRubens/core|12251dc67f721b063f2bedf5299322aac5292298
-        pr3545|git|https://github.com/AngeloRubens/core|38f94f38cb2ea46c46913696148fc9b2fe28016c
-        owb-4.1.1|owb|4.1.1
         pr3545-reqcache|git|https://github.com/AngeloRubens/core|d1fa54e24f26936e56e24c47c4da572a749435bd
+        resolve-default|git|https://github.com/AngeloRubens/core|204ff4b33d702401a1fc579c045651641c39a27a
       JMH_OPTS: '-f 5 -wi 3 -w 3s -i 5 -r 3s'
       ROUNDS: '2'
     steps:
