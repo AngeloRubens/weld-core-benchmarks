@@ -1,0 +1,65 @@
+name: Weld core tests of the getBeans(Class) experiment
+
+on:
+  push:
+    branches: [ ci/core-tests ]
+  workflow_dispatch:
+
+jobs:
+  tests:
+    name: ${{ matrix.label }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # the change with its test: everything must pass
+          - label: resolve-default
+            commit: 3b8995cb3
+            full: true
+          # the same without clearing the new cache: the new test must fail
+          - label: resolve-default-without-clear
+            commit: 26e3caee
+            full: false
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Fetch Weld core
+        run: |
+          git init -q core
+          git -C core remote add origin https://github.com/AngeloRubens/core
+          git -C core fetch -q origin 'refs/heads/perf/*:refs/remotes/origin/perf/*'
+          git -C core checkout -q --detach ${{ matrix.commit }}
+          git -C core log -1 --format='%H %s'
+      - name: Build Weld without tests
+        working-directory: core
+        run: mvn -B -ntp -V clean install -DskipTests -Dno-format
+      - name: Only the new test (expected to fail without the cache clearing)
+        if: ${{ !matrix.full }}
+        working-directory: core
+        run: |
+          mvn -B -ntp verify -Dno-format -pl tests-arquillian -Dtest=DefaultQualifierLookupTest -Dsurefire.failIfNoSpecifiedTests=false -DfailIfNoTests=false | tee ../new-test.log || true
+          tail -40 ../new-test.log
+          grep -E "Tests run:.*DefaultQualifierLookupTest|Tests run:.*Fail" ../new-test.log | head
+          if grep -q "lookupDuringBootDoesNotHideBeanAddedLater" ../new-test.log && grep -q "FAIL\|Failures: [1-9]" ../new-test.log; then echo "the new test fails as intended"; else echo "the new test did NOT fail"; exit 1; fi
+      - name: All tests (same command as the Weld CI)
+        if: ${{ matrix.full }}
+        working-directory: core
+        run: mvn -B -ntp clean verify -Dno-format -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false 2>&1 | tee ../all-tests.log
+      - name: CDI TCK on Weld SE
+        if: ${{ always() && matrix.full }}
+        working-directory: core
+        run: mvn -B -ntp clean verify -Dincontainer=se -Dno-format -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -f jboss-tck-runner/pom.xml 2>&1 | tee ../tck.log
+      - name: Summary
+        if: always()
+        run: |
+          for f in all-tests.log tck.log new-test.log; do [ -f "$f" ] || continue; echo "### $f"; grep -E "Tests run:.*Fail|BUILD|Reactor Summary" "$f" | tail -8; done | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: logs-${{ matrix.label }}
+          path: '*.log'
