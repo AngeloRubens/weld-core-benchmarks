@@ -1,4 +1,4 @@
-name: Profile the JAX-RS example
+name: Profile the JAX-RS service layer (shop)
 
 on:
   push:
@@ -12,6 +12,7 @@ jobs:
     env:
       VARIANTS: |
         main-base|git|https://github.com/AngeloRubens/core|12251dc67f721b063f2bedf5299322aac5292298
+        pr3545|git|https://github.com/AngeloRubens/core|38f94f38cb2ea46c46913696148fc9b2fe28016c
         pr3545-reqcache|git|https://github.com/AngeloRubens/core|d1fa54e24f26936e56e24c47c4da572a749435bd
       JMH_OPTS: '-f 1 -wi 3 -w 3s -i 5 -r 5s -t 1 -jvmArgsAppend -XX:+UnlockDiagnosticVMOptions -jvmArgsAppend -XX:+DebugNonSafepoints'
     steps:
@@ -48,9 +49,9 @@ jobs:
           while IFS='|' read -r label rest; do
             [ -z "$label" ] && continue
             out=results/$label; mkdir -p "$out"
-            java -jar "jars/$label.jar" 'JaxrsBenchmark.get' $JMH_OPTS -prof gc -rf json -rff "$out/gc.json" | tee "$out/gc.txt"
-            java -jar "jars/$label.jar" 'JaxrsBenchmark.get' $JMH_OPTS -prof "async:libPath=$ASYNC_PROFILER;event=cpu;output=flamegraph,collapsed;dir=$out/cpu" | tee "$out/cpu.txt"
-            java -jar "jars/$label.jar" 'JaxrsBenchmark.get' $JMH_OPTS -prof "async:libPath=$ASYNC_PROFILER;event=alloc;output=flamegraph,collapsed;dir=$out/alloc" | tee "$out/alloc.txt"
+            java -jar "jars/$label.jar" 'JaxrsBenchmark.shop' $JMH_OPTS -prof gc -rf json -rff "$out/gc.json" | tee "$out/gc.txt"
+            java -jar "jars/$label.jar" 'JaxrsBenchmark.shop' $JMH_OPTS -prof "async:libPath=$ASYNC_PROFILER;event=cpu;output=flamegraph,collapsed;dir=$out/cpu" | tee "$out/cpu.txt"
+            java -jar "jars/$label.jar" 'JaxrsBenchmark.shop' $JMH_OPTS -prof "async:libPath=$ASYNC_PROFILER;event=alloc;output=flamegraph,collapsed;dir=$out/alloc" | tee "$out/alloc.txt"
           done <<< "$VARIANTS"
       - name: Summary
         if: always()
@@ -60,12 +61,13 @@ jobs:
             for d in results/*/; do
               l=$(basename "$d")
               echo; echo "### $l"
-              echo '```'; grep -hE '^JaxrsBenchmark\.get(:gc\.(alloc\.rate\.norm|count|time))? ' "$d/gc.txt" || true; echo '```'
+              echo '```'; grep -hE '^JaxrsBenchmark\.shop(:gc\.(alloc\.rate\.norm|count|time))? ' "$d/gc.txt" || true; echo '```'
               for kind in cpu alloc; do
                 f=$(find "$d/$kind" -name '*collapsed*' | head -1)
                 [ -n "$f" ] || continue
                 echo; echo "#### $kind"
                 python3 scripts/share.py "$f"
+                python3 scripts/inclusive.py "$f"
                 python3 scripts/stacks.py "$f" 25
               done
             done

@@ -34,6 +34,13 @@ public class JaxrsBenchmark {
         server.close();
     }
 
+    /** Service layer where every call goes through a Timed/Logged/Tx interceptor: 8 interceptor calls per request. */
+    @Benchmark
+    public int shop() throws Exception {
+        MockHttpResponse r = server.get("/shop/7", "bench");
+        return r.getStatus();
+    }
+
     @Benchmark
     public int get() throws Exception {
         MockHttpResponse r = server.get("/orders/7", "bench");
