@@ -1,0 +1,78 @@
+name: getBeans micro benchmark
+
+on:
+  push:
+    branches: [ ci/getbeans-micro ]
+  workflow_dispatch:
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      # <label>|git|repo|commit
+      VARIANTS: |
+        before-3552|git|https://github.com/AngeloRubens/core|d1fa54e24f26936e56e24c47c4da572a749435bd
+        after-getbeans|git|https://github.com/AngeloRubens/core|a1b21a7cab4040d3c443961dfa20098305e95e92
+      JMH_OPTS: '-f 5 -wi 3 -w 2s -i 5 -r 2s'
+      ROUNDS: '2'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Environment
+        run: java -version; nproc; lscpu | grep 'Model name'
+      - name: Build one jar per variant
+        run: |
+          mkdir -p jars results
+          while IFS='|' read -r label kind a b; do
+            [ -z "$label" ] && continue
+            src=$RUNNER_TEMP/src-$label
+            rm -rf "$src"; git init -q "$src"
+            git -C "$src" remote add origin "$a"
+            git -C "$src" fetch -q --depth 1 origin "$b"
+            git -C "$src" checkout -q --detach FETCH_HEAD
+            (cd "$src" && mvn -B -ntp -q install -DskipTests -Dno-format -pl environments/se/build -am)
+            version=$(cd "$src" && mvn -B -ntp -q help:evaluate -Dexpression=project.version -DforceStdout)
+            (cd getbeans && mvn -B -ntp -q clean package -Dweld.version="$version")
+            cp getbeans/target/getbeans.jar "jars/$label.jar"
+            # the fix must really be in (or out of) the jar being measured
+            if unzip -p "jars/$label.jar" org/jboss/weld/resolution/TypeSafeBeanResolver.class | grep -q resolveWithDefaultQualifier; then echo "$label: contains resolveWithDefaultQualifier"; else echo "$label: does not contain resolveWithDefaultQualifier"; fi
+          done <<< "$VARIANTS"
+          unzip -p jars/after-getbeans.jar org/jboss/weld/resolution/TypeSafeBeanResolver.class | grep -q resolveWithDefaultQualifier
+          ! unzip -p jars/before-3552.jar org/jboss/weld/resolution/TypeSafeBeanResolver.class | grep -q resolveWithDefaultQualifier
+      - name: JMH, rounds interleaved across variants
+        run: |
+          labels=$(echo "$VARIANTS" | cut -d'|' -f1 | tr '\n' ' ')
+          for round in $(seq 1 $ROUNDS); do
+            for label in $labels; do
+              for t in 1 4; do
+                echo "== round $round: $label ($t threads)"
+                java -jar "jars/$label.jar" GetBeansBenchmark $JMH_OPTS -t $t -rf json -rff "results/$label.${t}thread.round$round.json"
+              done
+            done
+          done
+      - name: Allocation per call (-prof gc, 1 thread)
+        run: |
+          for label in $(echo "$VARIANTS" | cut -d'|' -f1); do
+            java -jar "jars/$label.jar" GetBeansBenchmark -f 1 -wi 3 -w 2s -i 5 -r 2s -t 1 -prof gc | tee "results/gc-$label.txt"
+          done
+      - name: Summary
+        if: always()
+        run: |
+          labels=$(echo "$VARIANTS" | cut -d'|' -f1 | tr '\n' ' ')
+          {
+            echo "## getBeans micro benchmark ($(nproc) cores, $ROUNDS rounds, $JMH_OPTS); ns/op, lower is better; ratio to the first column"
+            python3 scripts/summary.py results "$labels"
+            echo; echo "## Allocation per call"; echo '```'
+            for l in $labels; do echo "$l"; grep -hE '^GetBeansBenchmark\.[a-zA-Z]+(:gc\.alloc\.rate\.norm)? ' "results/gc-$l.txt" || true; done
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY" > results/REPORT.md
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results
+          path: results/

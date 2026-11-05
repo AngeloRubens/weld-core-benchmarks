@@ -58,7 +58,11 @@ public class GetBeansBenchmark {
     private BeanManager bm;
     private Annotation special;
     private Annotation dflt;
-    private int next;
+
+    @State(Scope.Thread)
+    public static class Cursor {
+        int next;
+    }
 
     @Setup
     public void setup() {
@@ -94,8 +98,8 @@ public class GetBeansBenchmark {
 
     /** Eight classes in turn, no qualifiers. */
     @Benchmark
-    public Set<Bean<?>> classNoQualifierEight() {
-        return bm.getBeans(MANY[(next++) & 7]);
+    public Set<Bean<?>> classNoQualifierEight(Cursor c) {
+        return bm.getBeans(MANY[(c.next++) & 7]);
     }
 
     /** Control: same bean with an explicit @Default; takes the old path in both builds. */
